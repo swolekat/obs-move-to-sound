@@ -185,3 +185,81 @@ jobs:
         with:
           name: '${{ env.FILE_NAME }}'
           path: package/*
+
+  macos64:
+    name: "macOS Build"
+    runs-on: [macos-latest]
+    env:
+      QT_VERSION: '5.15.2'
+      MACOS_DEPS_VERSION: '2021-02-28'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2.3.3
+        with:
+          repository: obsproject/obs-studio
+          ref: ${{ env.OBS_VERSION }}
+          submodules: 'recursive'
+      - name: "Checkout plugin"
+        uses: actions/checkout@v2.3.3
+        with:
+          path: plugins/${{ env.PLUGIN_NAME }}
+      - name: Fetch Git Tags
+        run: |
+          cd plugins/${{ env.PLUGIN_NAME }}
+          git fetch --prune --tags --unshallow
+      - name: 'Install prerequisites (Homebrew)'
+        shell: bash
+        run: |
+          if [ -d /usr/local/opt/openssl@1.0.2t ]; then
+              brew uninstall openssl@1.0.2t
+              brew untap local/openssl
+          fi
+          if [ -d /usr/local/opt/python@2.7.17 ]; then
+              brew uninstall python@2.7.17
+              brew untap local/python2
+          fi
+          brew bundle --file ./CI/scripts/macos/Brewfile
+      - name: 'Install prerequisite: Pre-built dependencies'
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          curl -L -O https://github.com/obsproject/obs-deps/releases/download/${{ env.MACOS_DEPS_VERSION }}/macos-deps-${{ env.MACOS_DEPS_VERSION }}.tar.gz
+          tar -xf ./macos-deps-${{ env.MACOS_DEPS_VERSION }}.tar.gz -C "/tmp"
+      - name: 'Install prerequisite: Pre-built dependency Qt'
+        if: steps.deps-qt-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          curl -L -O https://github.com/obsproject/obs-deps/releases/download/${{ env.MACOS_DEPS_VERSION }}/macos-qt-${{ env.QT_VERSION }}-${{ env.MACOS_DEPS_VERSION }}.tar.gz
+          tar -xf ./macos-qt-${{ env.QT_VERSION }}-${{ env.MACOS_DEPS_VERSION }}.tar.gz -C "/tmp"
+          xattr -r -d com.apple.quarantine /tmp/obsdeps
+      - name: Configure
+        shell: bash
+        run: |
+          echo "add_subdirectory(${{ env.PLUGIN_NAME }})" >> plugins/CMakeLists.txt
+          mkdir ./build
+          cd ./build
+          cmake -DDISABLE_PYTHON=ON -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13 -DQTDIR="/tmp/obsdeps" -DSWIGDIR="/tmp/obsdeps" -DDepsPath="/tmp/obsdeps" -DBUILD_BROWSER=OFF -DENABLE_PIPEWIRE=OFF -DBUILD_VST=OFF -DBUILD_VIRTUALCAM=OFF -DENABLE_SCRIPTING=OFF ..
+          cd -
+      - name: Build
+        shell: bash
+        run: |
+          set -e
+          cd ./build
+          make -j4
+          cd -
+      - name: Package
+        shell: bash
+        run: |
+          FILE_DATE=$(date +%Y-%m-%d)
+          FILE_NAME=${{ env.PLUGIN_NAME }}-$FILE_DATE-${{ github.sha }}-macos
+          echo "FILE_NAME=${FILE_NAME}" >> $GITHUB_ENV
+          mkdir -p ./package/bin/
+          mkdir -p ./package/data/
+          mv ./build/plugins/${{ env.PLUGIN_NAME }}/${{ env.PLUGIN_NAME }}.so ./package/bin/${{ env.PLUGIN_NAME }}.so
+          mv ./plugins/${{ env.PLUGIN_NAME }}/data/* ./package/data/
+      - name: Publish zip
+        if: success()
+        uses: actions/upload-artifact@v2.2.0
+        with:
+          name: '${{ env.FILE_NAME }}'
+          path: 'package/*'
