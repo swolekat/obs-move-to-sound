@@ -92,12 +92,12 @@ jobs:
         shell: bash
         run: |
           FILE_DATE=$(date +%Y-%m-%d)
-          FILE_NAME=${{ env.PLUGIN_NAME }}-$FILE_DATE-${{ github.sha }}-linux64.tar.gz
+          FILE_NAME=${{ env.PLUGIN_NAME }}-$FILE_DATE-${{ github.sha }}-linux64
           echo "FILE_NAME=${FILE_NAME}" >> $GITHUB_ENV
-          mkdir -p ./package/bin/64bit/
-          mkdir -p ./package/data/
-          mv ./build/plugins/${{ env.PLUGIN_NAME }}/${{ env.PLUGIN_NAME }}.so ./package/bin/64bit/${{ env.PLUGIN_NAME }}.so
-          mv ./plugins/${{ env.PLUGIN_NAME }}/data/* ./package/data/
+          mkdir -p ./package/${{ env.PLUGIN_NAME }}/bin/64bit/
+          mkdir -p ./package/${{ env.PLUGIN_NAME }}/data/
+          mv ./build/plugins/${{ env.PLUGIN_NAME }}/${{ env.PLUGIN_NAME }}.so ./package/${{ env.PLUGIN_NAME }}/bin/64bit/${{ env.PLUGIN_NAME }}.so
+          mv ./plugins/${{ env.PLUGIN_NAME }}/data/* ./package/${{ env.PLUGIN_NAME }}/data/
       - name: Publish
         uses: actions/upload-artifact@v2.2.0
         with:
@@ -178,7 +178,7 @@ jobs:
           robocopy .\build64\rundir\RelWithDebInfo\obs-plugins\64bit\ .\package\obs-plugins\64bit ${{ env.PLUGIN_NAME }}.* /E /XF .gitignore
           robocopy .\build64\rundir\RelWithDebInfo\data\obs-plugins\${{ env.PLUGIN_NAME }}\ .\package\data\obs-plugins\${{ env.PLUGIN_NAME }}\ /E /XF .gitignore
           exit 0
-      - name: Publish zip
+      - name: Publish
         if: success()
         uses: actions/upload-artifact@v2.2.0
         with:
@@ -252,11 +252,11 @@ jobs:
           FILE_DATE=$(date +%Y-%m-%d)
           FILE_NAME=${{ env.PLUGIN_NAME }}-$FILE_DATE-${{ github.sha }}-macos64
           echo "FILE_NAME=${FILE_NAME}" >> $GITHUB_ENV
-          mkdir -p ./package/bin/
-          mkdir -p ./package/data/
-          mv ./build/plugins/${{ env.PLUGIN_NAME }}/${{ env.PLUGIN_NAME }}.so ./package/bin/${{ env.PLUGIN_NAME }}.so
-          mv ./plugins/${{ env.PLUGIN_NAME }}/data/* ./package/data/
-      - name: Publish zip
+          mkdir -p ./package/${{ env.PLUGIN_NAME }}/bin/
+          mkdir -p ./package/${{ env.PLUGIN_NAME }}/data/
+          mv ./build/plugins/${{ env.PLUGIN_NAME }}/${{ env.PLUGIN_NAME }}.so ./package/${{ env.PLUGIN_NAME }}/bin/${{ env.PLUGIN_NAME }}.so
+          mv ./plugins/${{ env.PLUGIN_NAME }}/data/* ./package/${{ env.PLUGIN_NAME }}/data/
+      - name: Publish
         if: success()
         uses: actions/upload-artifact@v2.2.0
         with:
