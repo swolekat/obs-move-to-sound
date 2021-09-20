@@ -19,13 +19,6 @@ jobs:
           repository: obsproject/obs-studio
           ref: ${{ env.OBS_VERSION }}
           submodules: recursive
-      - name: Get plugin source
-        uses: actions/checkout@v2.3.3
-        with:
-          path: plugins/${{ env.PLUGIN_NAME }}
-      - name: Add plugin to OBS cmake
-        shell: bash
-        run: echo "add_subdirectory(${{ env.PLUGIN_NAME }})" >> plugins/CMakeLists.txt
       - name: Fetch Git Tags
         run: git fetch --prune --tags --unshallow
       - name: Install dependencies
@@ -72,25 +65,22 @@ jobs:
            qtbase5-private-dev \
            libqt5svg5-dev \
            linux-generic
+      - name: Remove all OBS Plugins
+        shell: bash
+        run: |
+          rm -R plugins/*
+      - name: Get plugin source
+        uses: actions/checkout@v2.3.3
+        with:
+          path: plugins/${{ env.PLUGIN_NAME }}
       - name: Configure
         shell: bash
         run: |
+          echo "add_subdirectory(${{ env.PLUGIN_NAME }})" >> plugins/CMakeLists.txt
           mkdir ./build
           cd ./build
           cmake -DUNIX_STRUCTURE=0 \
           -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/obs-studio-portable" \
-          -DBUILD_CAPTIONS=OFF \
-          -DWITH_RTMPS=OFF \
-          -DCOMPILE_FTL=OFF \
-          -DBUILD_BROWSER=OFF \
-          -DBUILD_VIRTUALCAM=OFF \
-          -DBUILD_VST=OFF \
-          -DENABLE_PIPEWIRE=OFF \
-          -DENABLE_SCRIPTING=OFF \
-          -DDISABLE_JACK=ON \
-          -DDISABLE_ALSA=ON \
-          -DDISABLE_V4L2=ON \
-          -DDISABLE_LIBFDK=ON \
           -DDISABLE_UI=ON ..
       - name: Build
         shell: bash
@@ -129,13 +119,6 @@ jobs:
           repository: obsproject/obs-studio
           ref: ${{ env.OBS_VERSION }}
           submodules: recursive
-      - name: Get plugin source
-        uses: actions/checkout@v2.3.3
-        with:
-          path: plugins/${{ env.PLUGIN_NAME }}
-      - name: Add plugin to OBS cmake
-        shell: cmd
-        run: echo add_subdirectory(${{ env.PLUGIN_NAME }}) >> plugins/CMakeLists.txt
       - name: 'Restore QT dependency from cache'
         id: qt-cache
         uses: actions/cache@v2.1.2
@@ -162,16 +145,25 @@ jobs:
         run: |
           curl -kLO https://cdn-fastly.obsproject.com/downloads/dependencies${{ env.WINDOWS_DEPS_VERSION }}.zip -f --retry 5 -C -
           7z x dependencies${{ env.WINDOWS_DEPS_VERSION }}.zip -o"${{ github.workspace }}/cmbuild/deps"
+      - name: Remove all OBS Plugins
+        run: |
+          rmdir /s /q plugins
+          mkdir plugins
+      - name: Get plugin source
+        uses: actions/checkout@v2.3.3
+        with:
+          path: plugins/${{ env.PLUGIN_NAME }}
       - name: Configure
         run: |
+          echo add_subdirectory(${{ env.PLUGIN_NAME }}) >> plugins/CMakeLists.txt
           mkdir ./package
           mkdir ./build32
           cd ./build32
-          cmake -G"${{ env.CMAKE_GENERATOR }}" -A"Win32" -DCMAKE_SYSTEM_VERSION="${{ env.CMAKE_SYSTEM_VERSION }}" -DBUILD_BROWSER=false -DDISALBE_UI=true -DBUILD_VST=false -DBUILD_VIRTUALCAM=false -DBUILD_CAPTIONS=false -DCOMPILE_D3D12_HOOK=false -DENABLE_SCRIPTING=false -DDepsPath="${{ github.workspace }}/cmbuild/deps/win32" -DQTDIR="${{ github.workspace }}/cmbuild/QT/${{ env.QT_VERSION }}/msvc2019" -DCOPIED_DEPENDENCIES=FALSE -DCOPY_DEPENDENCIES=TRUE ..
+          cmake -G"${{ env.CMAKE_GENERATOR }}" -A"Win32" -DCMAKE_SYSTEM_VERSION="${{ env.CMAKE_SYSTEM_VERSION }}" -DDISALBE_UI=true -DCOMPILE_D3D12_HOOK=false -DENABLE_SCRIPTING=false -DDepsPath="${{ github.workspace }}/cmbuild/deps/win32" -DQTDIR="${{ github.workspace }}/cmbuild/QT/${{ env.QT_VERSION }}/msvc2019" -DCOPIED_DEPENDENCIES=FALSE -DCOPY_DEPENDENCIES=TRUE ..
           cd ..
           mkdir ./build64
           cd ./build64
-          cmake -G"${{ env.CMAKE_GENERATOR }}" -A"x64" -DCMAKE_SYSTEM_VERSION="${{ env.CMAKE_SYSTEM_VERSION }}" -DBUILD_BROWSER=false -DDISABLE_UI=true -DBUILD_VST=false -DBUILD_VIRTUALCAM=false -DBUILD_CAPTIONS=false -DCOMPILE_D3D12_HOOK=false -DENABLE_SCRIPTING=false -DDepsPath="${{ github.workspace }}/cmbuild/deps/win64" -DQTDIR="${{ github.workspace }}/cmbuild/QT/${{ env.QT_VERSION }}/msvc2019_64" -DCOPIED_DEPENDENCIES=FALSE -DCOPY_DEPENDENCIES=TRUE ..
+          cmake -G"${{ env.CMAKE_GENERATOR }}" -A"x64" -DCMAKE_SYSTEM_VERSION="${{ env.CMAKE_SYSTEM_VERSION }}" -DDISABLE_UI=true -DCOMPILE_D3D12_HOOK=false -DENABLE_SCRIPTING=false -DDepsPath="${{ github.workspace }}/cmbuild/deps/win64" -DQTDIR="${{ github.workspace }}/cmbuild/QT/${{ env.QT_VERSION }}/msvc2019_64" -DCOPIED_DEPENDENCIES=FALSE -DCOPY_DEPENDENCIES=TRUE ..
       - name: Build 32-bit
         run: msbuild /m /p:Configuration=RelWithDebInfo .\build32\obs-studio.sln
       - name: Build 64-bit
@@ -200,19 +192,14 @@ jobs:
       QT_VERSION: '5.15.2'
       MACOS_DEPS_VERSION: '2021-02-28'
     steps:
-      - name: Checkout
+      - name: Get OBS source
         uses: actions/checkout@v2.3.3
         with:
           repository: obsproject/obs-studio
           ref: ${{ env.OBS_VERSION }}
           submodules: 'recursive'
-      - name: "Checkout plugin"
-        uses: actions/checkout@v2.3.3
-        with:
-          path: plugins/${{ env.PLUGIN_NAME }}
       - name: Fetch Git Tags
         run: |
-          cd plugins/${{ env.PLUGIN_NAME }}
           git fetch --prune --tags --unshallow
       - name: 'Install prerequisites (Homebrew)'
         shell: bash
@@ -239,13 +226,23 @@ jobs:
           curl -L -O https://github.com/obsproject/obs-deps/releases/download/${{ env.MACOS_DEPS_VERSION }}/macos-qt-${{ env.QT_VERSION }}-${{ env.MACOS_DEPS_VERSION }}.tar.gz
           tar -xf ./macos-qt-${{ env.QT_VERSION }}-${{ env.MACOS_DEPS_VERSION }}.tar.gz -C "/tmp"
           xattr -r -d com.apple.quarantine /tmp/obsdeps
+      - name: Remove all OBS Plugins
+        shell: bash
+        run: |
+          rm -R plugins/*
+      - name: Get plugin source
+        uses: actions/checkout@v2.3.3
+        with:
+          path: plugins/${{ env.PLUGIN_NAME }}
       - name: Configure
         shell: bash
         run: |
           echo "add_subdirectory(${{ env.PLUGIN_NAME }})" >> plugins/CMakeLists.txt
           mkdir ./build
           cd ./build
-          cmake -DDISABLE_PYTHON=ON -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13 -DQTDIR="/tmp/obsdeps" -DSWIGDIR="/tmp/obsdeps" -DDepsPath="/tmp/obsdeps" -DBUILD_BROWSER=OFF -DDISABLE_UI=ON -DENABLE_PIPEWIRE=OFF -DBUILD_VST=OFF -DBUILD_VIRTUALCAM=OFF -DENABLE_SCRIPTING=OFF ..
+          cmake -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13 -DQTDIR="/tmp/obsdeps" -DSWIGDIR="/tmp/obsdeps" -DDepsPath="/tmp/obsdeps" \
+          -DENABLE_SCRIPTING=OFF \
+          -DDISABLE_UI=ON ..
           cd -
       - name: Build
         shell: bash
