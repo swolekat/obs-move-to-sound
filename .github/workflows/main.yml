@@ -151,13 +151,13 @@ jobs:
         run: |
           rmdir /s /q plugins
           mkdir plugins
+          echo add_subdirectory(${{ env.PLUGIN_NAME }}) >> plugins\CMakeLists.txt
       - name: Get plugin source
         uses: actions/checkout@v2.3.3
         with:
           path: plugins/${{ env.PLUGIN_NAME }}
       - name: Configure
         run: |
-          echo add_subdirectory(${{ env.PLUGIN_NAME }}) >> plugins/CMakeLists.txt
           mkdir ./package
           mkdir ./build32
           cd ./build32
