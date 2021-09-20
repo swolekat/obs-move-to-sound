@@ -81,6 +81,7 @@ jobs:
           cd ./build
           cmake -DUNIX_STRUCTURE=0 \
           -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/obs-studio-portable" \
+          -DENABLE_SCRIPTING=OFF \
           -DDISABLE_UI=ON ..
       - name: Build
         shell: bash
@@ -146,6 +147,7 @@ jobs:
           curl -kLO https://cdn-fastly.obsproject.com/downloads/dependencies${{ env.WINDOWS_DEPS_VERSION }}.zip -f --retry 5 -C -
           7z x dependencies${{ env.WINDOWS_DEPS_VERSION }}.zip -o"${{ github.workspace }}/cmbuild/deps"
       - name: Remove all OBS Plugins
+        shell: cmd
         run: |
           rmdir /s /q plugins
           mkdir plugins
@@ -219,13 +221,6 @@ jobs:
         run: |
           curl -L -O https://github.com/obsproject/obs-deps/releases/download/${{ env.MACOS_DEPS_VERSION }}/macos-deps-${{ env.MACOS_DEPS_VERSION }}.tar.gz
           tar -xf ./macos-deps-${{ env.MACOS_DEPS_VERSION }}.tar.gz -C "/tmp"
-      - name: 'Install prerequisite: Pre-built dependency Qt'
-        if: steps.deps-qt-cache.outputs.cache-hit != 'true'
-        shell: bash
-        run: |
-          curl -L -O https://github.com/obsproject/obs-deps/releases/download/${{ env.MACOS_DEPS_VERSION }}/macos-qt-${{ env.QT_VERSION }}-${{ env.MACOS_DEPS_VERSION }}.tar.gz
-          tar -xf ./macos-qt-${{ env.QT_VERSION }}-${{ env.MACOS_DEPS_VERSION }}.tar.gz -C "/tmp"
-          xattr -r -d com.apple.quarantine /tmp/obsdeps
       - name: Remove all OBS Plugins
         shell: bash
         run: |
@@ -240,7 +235,7 @@ jobs:
           echo "add_subdirectory(${{ env.PLUGIN_NAME }})" >> plugins/CMakeLists.txt
           mkdir ./build
           cd ./build
-          cmake -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13 -DQTDIR="/tmp/obsdeps" -DSWIGDIR="/tmp/obsdeps" -DDepsPath="/tmp/obsdeps" \
+          cmake -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13 -DDepsPath="/tmp/obsdeps" \
           -DENABLE_SCRIPTING=OFF \
           -DDISABLE_UI=ON ..
           cd -
