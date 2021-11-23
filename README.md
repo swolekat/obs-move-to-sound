@@ -1,5 +1,11 @@
-# OBS Scale To Sound
-A plugin for OBS Studio that adds a filter which makes a source scale based on the audio levels of any audio source you choose 
+# OBS Move to Sound
+A plugin for OBS Studio that adds a filter which makes a source move based on the audio levels of any audio source you chose.
+
+
+TODO: EDIT REST OF THIS
+
+
+
 
 There are a few properties so you can fine tune how it behaves  
 ![Properties](https://qufy.cf/obs-scale-to-sound/plugin-properties-0-3-0.png)
