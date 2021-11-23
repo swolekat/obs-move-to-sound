@@ -27,10 +27,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #define MTS_INVSCL "MTS_INVSCL"
 #define MTS_SCALEW "MTS_SCALEW"
 #define MTS_SCALEH "MTS_SCALEH"
-#define MTS_STARTX "MTS_STARTX"
-#define MTS_STARTY "MTS_STARTY"
-#define MTS_ENDX "MTS_ENDX"
-#define MTS_ENDY "MTS_ENDY"
+#define MTS_QUIETX "MTS_QUIETX"
+#define MTS_QUIETY "MTS_QUIETY"
+#define MTS_LOUDX "MTS_LOUDX"
+#define MTS_LOUDY "MTS_LOUDY"
 
 OBS_DECLARE_MODULE()
 const char *get_source_name(void *unused)
@@ -63,10 +63,10 @@ struct move_to_sound_data {
 	gs_effect_t *mover;
 	obs_source_t *audio_source;
 
-	long long start_x;
-    long long start_y;
-    long long end_x;
-    long long end_y;
+	long long quiet_x;
+    long long quiet_y;
+    long long loud_x;
+    long long loud_y;
 };
 
 static void calculate_audio_level(void *param, obs_source_t *source, const struct audio_data *data, bool muted)
@@ -147,10 +147,10 @@ static void filter_update(void *data, obs_data_t *settings)
 	mtsf->max_w = w * max / 100;
 	mtsf->max_h = h * max / 100;
 
-	mtsf->start_x = obs_data_get_int(settings, MTS_STARTX);
-	mtsf->start_y = obs_data_get_int(settings, MTS_STARTY);
-	mtsf->end_x = obs_data_get_int(settings, MTS_ENDX);
-	mtsf->end_y = obs_data_get_int(settings, MTS_ENDY);
+	mtsf->quiet_x = obs_data_get_int(settings, MTS_QUIETX);
+	mtsf->quiet_y = obs_data_get_int(settings, MTS_QUIETY);
+	mtsf->loud_x = obs_data_get_int(settings, MTS_LOUDX);
+	mtsf->loud_y = obs_data_get_int(settings, MTS_LOUDY);
 
 	double min_audio_level = obs_data_get_double(settings, MTS_MINLVL);
 	mtsf->minimum_audio_level = min_audio_level;
@@ -209,11 +209,11 @@ static obs_properties_t *filter_properties(void *data)
 	obs_properties_add_bool(p, MTS_SCALEW, "Scale Width");
 	obs_properties_add_bool(p, MTS_SCALEH, "Scale Height");
 
-    obs_property_t *startx = (int)obs_data_get_int(MTS_STARTX, "Start X");
-    obs_property_t *startY = (int)obs_data_get_int(MTS_STARTY, "Start Y");
+    obs_property_t *quietx = (int)obs_data_get_int(MTS_QUIETX, "Quiet X");
+    obs_property_t *quietY = (int)obs_data_get_int(MTS_QUIETY, "Quiet Y");
 
-    obs_property_t *endx = (int)obs_data_get_int(MTS_ENDX, "End X");
-    obs_property_t *endY = (int)obs_data_get_int(MTS_ENDY, "End Y");
+    obs_property_t *loudx = (int)obs_data_get_int(MTS_LOUDX, "Loud X");
+    obs_property_t *loudY = (int)obs_data_get_int(MTS_LOUDY, "Loud Y");
 
 	return p;
 }
@@ -229,10 +229,10 @@ static void filter_defaults(obs_data_t *settings)
 	obs_data_set_default_bool(settings, MTS_SCALEW, true);
 	obs_data_set_default_bool(settings, MTS_SCALEH, true);
 
-	obs_data_set_default_int(settings, MTS_STARTX, 0);
-	obs_data_set_default_int(settings, MTS_STARTY, 0);
-	obs_data_set_default_int(settings, MTS_ENDX, 0);
-	obs_data_set_default_int(settings, MTS_ENDY, 0);
+	obs_data_set_default_int(settings, MTS_QUIETX, 0);
+	obs_data_set_default_int(settings, MTS_QUIETY, 0);
+	obs_data_set_default_int(settings, MTS_LOUDX, 0);
+	obs_data_set_default_int(settings, MTS_LOUDY, 0);
 }
 
 static void filter_destroy(void *data)
@@ -269,7 +269,7 @@ static void target_update(void *data, float seconds) {
 		obs_data_release(settings);
 	}
 }
-static void filter_render(void *data, gs_effect_t *effect)
+static void filter_rlouder(void *data, gs_effect_t *effect)
 {
 	UNUSED_PARAMETER(effect);
 
@@ -305,7 +305,7 @@ static void filter_render(void *data, gs_effect_t *effect)
 	if(audio_h > mtsf->max_h) audio_h = mtsf->scale_h ? mtsf->max_h : h;
 
 	obs_enter_graphics();
-	obs_source_process_filter_begin(mtsf->context, GS_RGBA, OBS_ALLOW_DIRECT_RENDERING);
+	obs_source_process_filter_begin(mtsf->context, GS_RGBA, OBS_ALLOW_DIRECT_RLOUDERING);
 
 	gs_effect_t *move_effect = mtsf->mover;
 	gs_eparam_t *move_val = gs_effect_get_param_by_name(move_effect, "inputPos");
@@ -324,7 +324,7 @@ static void filter_render(void *data, gs_effect_t *effect)
 
 	gs_effect_set_vec4(move_val, &move_vec);
 
-	obs_source_process_filter_end(mtsf->context, move_effect, audio_w, audio_h);
+	obs_source_process_filter_loud(mtsf->context, move_effect, audio_w, audio_h);
 	obs_leave_graphics();
 }
 
@@ -339,7 +339,7 @@ struct obs_source_info move_to_sound = {
 	.load = filter_load,
 	.update = filter_update,
 	.video_tick = target_update,
-	.video_render = filter_render,
+	.video_rlouder = filter_rlouder,
 	.destroy = filter_destroy
 };
 
