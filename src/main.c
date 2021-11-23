@@ -324,7 +324,7 @@ static void filter_render(void *data, gs_effect_t *effect)
 
 	gs_effect_set_vec4(move_val, &move_vec);
 
-	obs_source_process_filter_loud(mtsf->context, move_effect, audio_w, audio_h);
+	obs_source_process_filter_end(mtsf->context, move_effect, audio_w, audio_h);
 	obs_leave_graphics();
 }
 
