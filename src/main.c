@@ -209,11 +209,11 @@ static obs_properties_t *filter_properties(void *data)
 	obs_properties_add_bool(p, MTS_SCALEW, "Scale Width");
 	obs_properties_add_bool(p, MTS_SCALEH, "Scale Height");
 
-    obs_property_t *quietx = (int)obs_data_get_int(MTS_QUIETX, "Quiet X");
-    obs_property_t *quietY = (int)obs_data_get_int(MTS_QUIETY, "Quiet Y");
+    obs_property_t *quietx = obs_properties_add_int(p, MTS_QUIETX, "Quiet X", -8192, 8192, 1);
+    obs_property_t *quietY = obs_properties_add_int(p, MTS_QUIETY, "Quiet Y", -8192, 8192, 1);
 
-    obs_property_t *loudx = (int)obs_data_get_int(MTS_LOUDX, "Loud X");
-    obs_property_t *loudY = (int)obs_data_get_int(MTS_LOUDY, "Loud Y");
+    obs_property_t *loudx = obs_properties_add_int(p, MTS_LOUDX, "Loud X", -8192, 8192, 1);
+    obs_property_t *loudY = obs_properties_add_int(p, MTS_LOUDY, "Loud Y", -8192, 8192, 1);
 
 	return p;
 }
