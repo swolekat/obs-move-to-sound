@@ -24,6 +24,7 @@ yay -S obs-scale-to-sound
 ```
 
 ## Thanks
+[Qufy](https://github.com/Qufyy) for making the original scale to sound plugin that this plugin is based on
 [brodi1](https://github.com/brodi1) for the [AUR Package](https://aur.archlinux.org/packages/?O=0&K=obs-scale-to-sound)  
 [Exeldro](https://github.com/exeldro) for the GitHub Actions workflow  
 OBS Studio team and contributors for making such a great tool  
