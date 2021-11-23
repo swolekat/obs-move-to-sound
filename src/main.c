@@ -209,11 +209,11 @@ static obs_properties_t *filter_properties(void *data)
 	obs_properties_add_bool(p, MTS_SCALEW, "Scale Width");
 	obs_properties_add_bool(p, MTS_SCALEH, "Scale Height");
 
-    obs_property_t *quietx = obs_properties_add_int(p, MTS_QUIETX, "Quiet X", -8192, 8192, 1);
-    obs_property_t *quietY = obs_properties_add_int(p, MTS_QUIETY, "Quiet Y", -8192, 8192, 1);
+    obs_properties_add_int(p, MTS_QUIETX, "Quiet X", -8192, 8192, 1);
+    obs_properties_add_int(p, MTS_QUIETY, "Quiet Y", -8192, 8192, 1);
 
-    obs_property_t *loudx = obs_properties_add_int(p, MTS_LOUDX, "Loud X", -8192, 8192, 1);
-    obs_property_t *loudY = obs_properties_add_int(p, MTS_LOUDY, "Loud Y", -8192, 8192, 1);
+    obs_properties_add_int(p, MTS_LOUDX, "Loud X", -8192, 8192, 1);
+    obs_properties_add_int(p, MTS_LOUDY, "Loud Y", -8192, 8192, 1);
 
 	return p;
 }
@@ -269,7 +269,7 @@ static void target_update(void *data, float seconds) {
 		obs_data_release(settings);
 	}
 }
-static void filter_rlouder(void *data, gs_effect_t *effect)
+static void filter_render(void *data, gs_effect_t *effect)
 {
 	UNUSED_PARAMETER(effect);
 
@@ -305,7 +305,7 @@ static void filter_rlouder(void *data, gs_effect_t *effect)
 	if(audio_h > mtsf->max_h) audio_h = mtsf->scale_h ? mtsf->max_h : h;
 
 	obs_enter_graphics();
-	obs_source_process_filter_begin(mtsf->context, GS_RGBA, OBS_ALLOW_DIRECT_RLOUDERING);
+	obs_source_process_filter_begin(mtsf->context, GS_RGBA, OBS_ALLOW_DIRECT_RENDERING);
 
 	gs_effect_t *move_effect = mtsf->mover;
 	gs_eparam_t *move_val = gs_effect_get_param_by_name(move_effect, "inputPos");
@@ -339,7 +339,7 @@ struct obs_source_info move_to_sound = {
 	.load = filter_load,
 	.update = filter_update,
 	.video_tick = target_update,
-	.video_rlouder = filter_rlouder,
+	.video_render = filter_render,
 	.destroy = filter_destroy
 };
 
