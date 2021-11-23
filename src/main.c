@@ -27,6 +27,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #define MTS_INVSCL "MTS_INVSCL"
 #define MTS_SCALEW "MTS_SCALEW"
 #define MTS_SCALEH "MTS_SCALEH"
+#define MTS_STARTX "MTS_STARTX"
+#define MTS_STARTY "MTS_STARTY"
+#define MTS_ENDX "MTS_ENDX"
+#define MTS_ENDY "MTS_ENDY"
 
 OBS_DECLARE_MODULE()
 const char *get_source_name(void *unused)
@@ -194,6 +198,12 @@ static obs_properties_t *filter_properties(void *data)
 
 	obs_properties_add_bool(p, MTS_SCALEW, "Scale Width");
 	obs_properties_add_bool(p, MTS_SCALEH, "Scale Height");
+
+	obs_properties_add_bool(p, MTS_STARTX, "Start X");
+    obs_properties_add_bool(p, MTS_STARTY, "Start Y");
+
+    obs_properties_add_bool(p, MTS_ENDX, "End X");
+    obs_properties_add_bool(p, MTS_ENDY, "End Y");
 
 	return p;
 }
