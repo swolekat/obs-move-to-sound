@@ -62,6 +62,11 @@ struct move_to_sound_data {
 
 	gs_effect_t *mover;
 	obs_source_t *audio_source;
+
+	long long start_x;
+    long long start_y;
+    long long end_x;
+    long long end_y;
 };
 
 static void calculate_audio_level(void *param, obs_source_t *source, const struct audio_data *data, bool muted)
@@ -142,6 +147,11 @@ static void filter_update(void *data, obs_data_t *settings)
 	mtsf->max_w = w * max / 100;
 	mtsf->max_h = h * max / 100;
 
+	mtsf->start_x = obs_data_get_int(settings, MTS_STARTX);
+	mtsf->start_y = obs_data_get_int(settings, MTS_STARTY);
+	mtsf->end_x = obs_data_get_int(settings, MTS_ENDX);
+	mtsf->end_y = obs_data_get_int(settings, MTS_ENDY);
+
 	double min_audio_level = obs_data_get_double(settings, MTS_MINLVL);
 	mtsf->minimum_audio_level = min_audio_level;
 
@@ -199,11 +209,11 @@ static obs_properties_t *filter_properties(void *data)
 	obs_properties_add_bool(p, MTS_SCALEW, "Scale Width");
 	obs_properties_add_bool(p, MTS_SCALEH, "Scale Height");
 
-	obs_properties_add_bool(p, MTS_STARTX, "Start X");
-    obs_properties_add_bool(p, MTS_STARTY, "Start Y");
+    obs_property_t *startx = (int)obs_data_get_int(MTS_STARTX, "Start X");
+    obs_property_t *startY = (int)obs_data_get_int(MTS_STARTY, "Start Y");
 
-    obs_properties_add_bool(p, MTS_ENDX, "End X");
-    obs_properties_add_bool(p, MTS_ENDY, "End Y");
+    obs_property_t *endx = (int)obs_data_get_int(MTS_ENDX, "End X");
+    obs_property_t *endY = (int)obs_data_get_int(MTS_ENDY, "End Y");
 
 	return p;
 }
@@ -218,6 +228,11 @@ static void filter_defaults(obs_data_t *settings)
 
 	obs_data_set_default_bool(settings, MTS_SCALEW, true);
 	obs_data_set_default_bool(settings, MTS_SCALEH, true);
+
+	obs_data_set_default_int(settings, MTS_STARTX, 0);
+	obs_data_set_default_int(settings, MTS_STARTY, 0);
+	obs_data_set_default_int(settings, MTS_ENDX, 0);
+	obs_data_set_default_int(settings, MTS_ENDY, 0);
 }
 
 static void filter_destroy(void *data)
