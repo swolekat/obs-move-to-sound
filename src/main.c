@@ -22,15 +22,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #define MTS_AUDSRC "MTS_AUDSRC"
 #define MTS_MINLVL "MTS_MIN_LVL"
-#define MTS_MINPER "MTS_MINPER"
-#define MTS_MAXPER "MTS_MAXPER"
-#define MTS_INVSCL "MTS_INVSCL"
-#define MTS_SCALEW "MTS_SCALEW"
-#define MTS_SCALEH "MTS_SCALEH"
 #define MTS_QUIETX "MTS_QUIETX"
 #define MTS_QUIETY "MTS_QUIETY"
 #define MTS_LOUDX "MTS_LOUDX"
 #define MTS_LOUDY "MTS_LOUDY"
+#define MTS_ANIMATIONTIME "MTS_ANIMATIONTIME"
+#define MTS_FADETIME "MTS_FADETIME"
 
 OBS_DECLARE_MODULE()
 const char *get_source_name(void *unused)
@@ -44,19 +41,6 @@ struct move_to_sound_data {
 
 	obs_property_t *sources_list;
 	double minimum_audio_level;
-	bool invert;
-	long long min;
-	long long max;
-	bool scale_w;
-	bool scale_h;
-
-	uint32_t src_w;
-	uint32_t src_h;
-
-	long long min_w;
-	long long min_h;
-	long long max_w;
-	long long max_h;
 
 	float audio_level;
 
@@ -67,6 +51,15 @@ struct move_to_sound_data {
     long long quiet_y;
     long long loud_x;
     long long loud_y;
+
+    bool audio_is_playing;
+    vec2 src_position;
+    bool at_top;
+    bool at_bottom;
+    double move_down_buffer_remaining;
+    double animation_time;
+    vec2 velocity_per_second;
+    double fade_time;
 };
 
 static void calculate_audio_level(void *param, obs_source_t *source, const struct audio_data *data, bool muted)
@@ -104,12 +97,6 @@ static void *filter_create(obs_data_t *settings, obs_source_t *source)
 	struct move_to_sound_data *mtsf = bzalloc(sizeof(*mtsf));
 	mtsf->context = source;
 
-	char *effect_file = obs_module_file("default_move.effect");
-	obs_enter_graphics();
-	mtsf->mover = gs_effect_create_from_file(effect_file, NULL);
-	obs_leave_graphics();
-	bfree(effect_file);
-
 	return mtsf;
 }
 static void filter_update(void *data, obs_data_t *settings)
@@ -118,34 +105,6 @@ static void filter_update(void *data, obs_data_t *settings)
 
 	obs_source_t *target = obs_filter_get_target(mtsf->context);
 	mtsf->target = target;
-
-	long long min = obs_data_get_int(settings, MTS_MINPER);
-	long long max = obs_data_get_int(settings, MTS_MAXPER);
-
-	uint32_t w = obs_source_get_base_width(target);
-	uint32_t h = obs_source_get_base_height(target);
-
-	mtsf->src_w = w;
-	mtsf->src_h = h;
-
-	if (max <= min) {
-		obs_data_set_int(settings, MTS_MAXPER, min + 1);
-		mtsf->max = min + 1;
-	}
-	else {
-		mtsf->max = max;
-	}
-	mtsf->min = min;
-
-	mtsf->invert = obs_data_get_bool(settings, MTS_INVSCL);
-
-	mtsf->scale_w = obs_data_get_bool(settings, MTS_SCALEW);
-	mtsf->scale_h = obs_data_get_bool(settings, MTS_SCALEH);
-
-	mtsf->min_w = w * min / 100;
-	mtsf->min_h = h * min / 100;
-	mtsf->max_w = w * max / 100;
-	mtsf->max_h = h * max / 100;
 
 	mtsf->quiet_x = obs_data_get_int(settings, MTS_QUIETX);
 	mtsf->quiet_y = obs_data_get_int(settings, MTS_QUIETY);
@@ -167,7 +126,14 @@ static void filter_update(void *data, obs_data_t *settings)
 	else {
 		obs_source_release(audio_source);
 	}
+
+    double animation_time = obs_data_get_double(settings, MTS_ANIMATIONTIME) / 1000;
+	mtsf->velocity_per_second = vec2((mtsf->loud_x - mtsf->quiet_x)/animation_time, (mtsf->loud_y - mtsf->quiet_y)/animation_time);
+
+	mtsf->fade_time = obs_data_get_double(settings, MTS_ANIMATIONTIME) / 1000;
+	mtsf->move_down_buffer_remaining = mtsf->fade_time;
 }
+
 static void filter_load(void *data, obs_data_t *settings)
 {
 	struct move_to_sound_data *mtsf = data;
@@ -198,14 +164,6 @@ static obs_properties_t *filter_properties(void *data)
 	obs_property_t *minlvl = obs_properties_add_float_slider(p, MTS_MINLVL, "Audio Threshold", -100, -0.5, 0.5);
 	obs_property_float_set_suffix(minlvl, "dB");
 
-	obs_property_t *minper = obs_properties_add_int_slider(p, MTS_MINPER, "Minimum Size", 0, 99, 1);
-	obs_property_int_set_suffix(minper, "%");
-
-	obs_property_t *maxper = obs_properties_add_int_slider(p, MTS_MAXPER, "Maximum Size", 1, 100, 1);
-	obs_property_int_set_suffix(maxper, "%");
-
-	obs_properties_add_bool(p, MTS_INVSCL, "Inverse Scaling");
-
 	obs_properties_add_bool(p, MTS_SCALEW, "Scale Width");
 	obs_properties_add_bool(p, MTS_SCALEH, "Scale Height");
 
@@ -215,24 +173,23 @@ static obs_properties_t *filter_properties(void *data)
     obs_properties_add_int(p, MTS_LOUDX, "Loud X", -8192, 8192, 1);
     obs_properties_add_int(p, MTS_LOUDY, "Loud Y", -8192, 8192, 1);
 
+	obs_property_t *anitime = obs_properties_add_float_slider(p, MTS_ANIMATIONTIME, "Fade Time", 0, 10000, 1);
+	obs_property_float_set_suffix(anitime, "ms");
+
+	obs_property_t *fadetime = obs_properties_add_float_slider(p, MTS_FADETIME, "Animation Time", 0, 10000, 1);
+    obs_property_float_set_suffix(fadetime, "ms");
+
 	return p;
 }
 static void filter_defaults(obs_data_t *settings)
 {
 	obs_data_set_default_double(settings, MTS_MINLVL, -40);
-
-	obs_data_set_default_int(settings, MTS_MINPER, 90);
-	obs_data_set_default_int(settings, MTS_MAXPER, 100);
-
-	obs_data_set_default_bool(settings, MTS_INVSCL, false);
-
-	obs_data_set_default_bool(settings, MTS_SCALEW, true);
-	obs_data_set_default_bool(settings, MTS_SCALEH, true);
-
 	obs_data_set_default_int(settings, MTS_QUIETX, 0);
 	obs_data_set_default_int(settings, MTS_QUIETY, 0);
 	obs_data_set_default_int(settings, MTS_LOUDX, 0);
 	obs_data_set_default_int(settings, MTS_LOUDY, 0);
+	obs_data_set_default_int(settings, MTS_ANIMATIONTIME, 1000);
+	obs_data_set_default_int(settings, MTS_FADETIME, 3000);
 }
 
 static void filter_destroy(void *data)
@@ -251,81 +208,108 @@ static void filter_destroy(void *data)
 
 static void target_update(void *data, float seconds) {
 	UNUSED_PARAMETER(seconds);
-	
+
 	//!This should really be done using a signal but I could not get those working so here we are...
 	struct move_to_sound_data *mtsf = data;
 
 	obs_source_t *target = mtsf->target;
+	mtsf->animation_time = mtsf->animation_time + seconds;
 
-	uint32_t w = mtsf->src_w;
-	uint32_t h = mtsf->src_h;
+//	todo here?
 
-	uint32_t new_w = obs_source_get_base_width(target);
-	uint32_t new_h = obs_source_get_base_height(target);
 
-	if(new_w != w || new_h != h) {
-		obs_data_t *settings = obs_source_get_settings(mtsf->context);
-		filter_update(mtsf, settings);
-		obs_data_release(settings);
-	}
 }
+
+static obs_sceneitem_t *get_scene_item() {
+    obs_source_t current_scene = obs_frontend_get_current_scene();
+    if(current_scene == null){
+        return null;
+    }
+    obs_source_release(current_scene)
+    obs_scene_t scene = obs.obs_scene_from_source(current_scene)
+    return obs.obs_scene_find_source(scene, mtsf->target.get_name)
+}
+
+static bool is_at_top(vec2 *scene_item_position){
+    return scene_item_position.x == mtsf->loud_x && scene_item_position.y == mtsf->loud_y;
+}
+
+static bool is_at_bottom(vec2 *scene_item_position){
+    return scene_item_position.x == mtsf->quiet_x && scene_item_position.y == mtsf->quiet_y;
+}
+
+static void move_up(vec2 *scene_item_position) {
+    vec2 animation_time_vec = vec2(mtsf->animation_time, mtsf->animation_time);
+    vec2 change = mtsf->velocity_per_second * mtsf->animation_time_vec;
+    vec2 new_pos = scene_item_position + change;
+//    todo make this generic
+    if(new_pos.x > mtsf->loud_x){
+        new_pos.x = mtsf->loud_x;
+    }
+    if(new_pos.y > mtsf->loud_y){
+        new_pos.y = mtsf->loud_y;
+    }
+    obs_sceneitem_set_pos(scene_item, new_pos)
+}
+
+static void move_down(obs_sceneitem_t *scene_item, vec2 *scene_item_position) {
+    vec2 animation_time_vec = vec2(mtsf->animation_time * -1, mtsf->animation_time * -1);
+    vec2 change = mtsf->velocity_per_second * mtsf->animation_time_vec;
+    vec2 new_pos = scene_item_position + change;
+    //    todo make this generic
+    if(new_pos.x < mtsf->quiet_x){
+        new_pos.x = mtsf->quiet_x;
+    }
+    if(new_pos.y < mtsf->quiet_y){
+        new_pos.y = mtsf->quiet_y;
+    }
+    obs_sceneitem_set_pos(scene_item, new_pos)
+}
+
 static void filter_render(void *data, gs_effect_t *effect)
 {
 	UNUSED_PARAMETER(effect);
 
+// todo here
 	struct move_to_sound_data *mtsf = data;
 
-	uint32_t w = mtsf->src_w;
-	uint32_t h = mtsf->src_h;
+	// 	struct vec4 move_vec;
 
-	uint32_t min_scale_percent = mtsf->min;
-	uint32_t max_scale_percent = mtsf->max;
 
 	double min_audio_level = mtsf->minimum_audio_level;
 	double audio_level = mtsf->audio_level;
 
 	if(min_audio_level >= 0) min_audio_level = -0.5f;
-	double scale_percent = fabs(min_audio_level) - fabs(audio_level);
 
-	//Scale the calculated from audio precentage down to the user-set range
-	scale_percent = (scale_percent * (max_scale_percent - min_scale_percent)) / fabs(min_audio_level) + min_scale_percent;
-	if(scale_percent < min_scale_percent || audio_level >= 0) scale_percent = min_scale_percent;
-
-	if(mtsf->invert) scale_percent = min_scale_percent + max_scale_percent - scale_percent;
-
-	uint32_t audio_w = mtsf->scale_w ? w * scale_percent / 100 : w;
-	uint32_t audio_h = mtsf->scale_h ? h * scale_percent / 100 : h;
-
-	if((audio_level < min_audio_level && !mtsf->invert) || audio_w < mtsf->min_w || audio_h < mtsf->min_h) {
-		audio_w = mtsf->scale_w ? mtsf->min_w : w;
-		audio_h = mtsf->scale_h ? mtsf->min_h : h;
-	}
-	
-	if(audio_w > mtsf->max_w) audio_w = mtsf->scale_w ? mtsf->max_w : w;
-	if(audio_h > mtsf->max_h) audio_h = mtsf->scale_h ? mtsf->max_h : h;
-
-	obs_enter_graphics();
-	obs_source_process_filter_begin(mtsf->context, GS_RGBA, OBS_ALLOW_DIRECT_RENDERING);
-
-	gs_effect_t *move_effect = mtsf->mover;
-	gs_eparam_t *move_val = gs_effect_get_param_by_name(move_effect, "inputPos");
-	gs_eparam_t *show = gs_effect_get_param_by_name(move_effect, "show");
-
-	gs_effect_set_float(show, 1.0f);
-	if(audio_w <= 0 || audio_h <= 0) {
-		gs_effect_set_float(show, 0.0f);
-		audio_w = 1;
-		audio_h = 1;
+	if(audio_level>=min_audio_level){
+	    mtsf->audio_is_playing = true;
+	    mtsf->move_down_buffer_remaining = mtsf->fade_time;
+	} else {
+	    mtsf->move_down_buffer_remaining = mtsf->move_down_buffer_remaining - mtsf->animation_time;
+	    mtsf->animation_time = 0;
+	    if(mtsf->move_down_buffer_remaining < 0){
+	        mtsf->audio_is_playing = false;
+	    }
 	}
 
-	//Change the position everytime so it looks like it's scaling from the center
-	struct vec4 move_vec;
-	vec4_set(&move_vec, (w - audio_w) / 2, (h - audio_h) / 2, 0.0f, 0.0f);
+	obs_sceneitem_t *scene_item = get_scene_item();
+	if(scene_item == null){
+	    return;
+	}
+	vec2 *scene_item_position;
+	obs_sceneitem_get_pos(scene_item, scene_item_position);
 
-	gs_effect_set_vec4(move_val, &move_vec);
+	bool at_top = is_at_top(scene_item_position);
+    bool at_bottom = is_at_bottom(scene_item_position);
 
-	obs_source_process_filter_end(mtsf->context, move_effect, audio_w, audio_h);
-	obs_leave_graphics();
+    if audio_is_playing && !at_top {
+        move_up(scene_item, scene_item_position);
+    }
+    if !audio_is_playing && !at_bottom {
+        move_down(scene_item, scene_item_position);
+    }
+
+    mtsf->animation_time = 0;
 }
 
 struct obs_source_info move_to_sound = {
